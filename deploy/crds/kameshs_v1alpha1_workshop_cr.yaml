@@ -1,0 +1,47 @@
+apiVersion: kameshs.dev/v1alpha1
+kind: Workshop
+metadata:
+  name: example-workshop
+  description: "Example Workshop"
+spec:
+  clean: false
+  openShiftAPIServer: "oauth-openshift.openshift-authentication"
+  project:
+    create: true
+    prefixes:
+      - tutorial
+  users:
+    create: true
+    prefix: "user"
+    password: "banana"
+    adminPassword: "j@ckF6uit"
+    start: 0
+    end: 50
+  stack:
+    install: true
+    cheVersion: 7.1.0
+    community:
+      - name: "knative-serving"
+        operator: "knative-serving-operator"
+        version: "0.7.1"
+      - name: "knative-eventing"
+        operator: "knative-eventing-operator"
+        version: "0.7.1"
+      - name: "pipelines"
+        operator: "openshift-pipelines-operator"
+        version: "0.5.2"
+    redhat:
+      - name: "elastic-search"
+        version: "4.1.15-201909041605"
+        operator: "elasticsearch-operator"
+      - name: "jaeger"
+        version: "1.13.1"
+        operator: "jaeger-product"
+      - name: "kiali"
+        version: "1.0.5"
+        operator: "kiali-ossm"
+        admin_username: "admin"
+        admin_password: "admin"
+      - name: "servicemesh"
+        version: "1.0.0"
+        operator: "servicemeshoperator"

@@ -1,0 +1,129 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: workshops.kameshs.dev
+spec:
+  group: kameshs.dev
+  names:
+    kind: Workshop
+    listKind: WorkshopList
+    plural: workshops
+    singular: workshop
+  scope: Namespaced
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          properties:
+            clean:
+              description: 'INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+                Important: Run "operator-sdk generate k8s" to regenerate code after
+                modifying this file Add custom validation using kubebuilder tags:
+                https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html'
+              type: boolean
+            openshiftAPIServer:
+              type: string
+            project:
+              properties:
+                create:
+                  type: boolean
+                prefixes:
+                  items:
+                    type: string
+                  type: array
+              required:
+              - create
+              - prefixes
+              type: object
+            stack:
+              properties:
+                cheVersion:
+                  type: string
+                community:
+                  items:
+                    properties:
+                      name:
+                        type: string
+                      operator:
+                        type: string
+                      version:
+                        type: string
+                    required:
+                    - name
+                    - version
+                    - operator
+                    type: object
+                  type: array
+                install:
+                  type: boolean
+                redhat:
+                  items:
+                    properties:
+                      name:
+                        type: string
+                      operator:
+                        type: string
+                      version:
+                        type: string
+                    required:
+                    - name
+                    - version
+                    - operator
+                    type: object
+                  type: array
+              required:
+              - install
+              - cheVersion
+              - community
+              - redhat
+              type: object
+            user:
+              properties:
+                adminPassword:
+                  type: string
+                create:
+                  type: boolean
+                end:
+                  type: byte
+                password:
+                  type: string
+                prefix:
+                  type: string
+                start:
+                  type: byte
+              required:
+              - create
+              - prefix
+              - password
+              - adminPassword
+              - start
+              - end
+              type: object
+          required:
+          - clean
+          - openshiftAPIServer
+          - project
+          - user
+          - stack
+          type: object
+        status:
+          type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
