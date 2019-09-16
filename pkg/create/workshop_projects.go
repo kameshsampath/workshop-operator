@@ -20,13 +20,13 @@ func WorkshopProjects(spec workshopv1alpha1.WorkshopSpec) []projectv1.Project {
 		for _, name := range prefixes {
 			pName := fmt.Sprintf("%s-%d", name, i)
 			pDesc := fmt.Sprintf("Project %s", pName)
-			pRequester := fmt.Sprintf("%s%02%d", spec.User.Prefix)
+			pRequester := fmt.Sprintf("%s%02d", spec.User.Prefix, i)
 			p := &projectv1.Project{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: pName,
 					Annotations: map[string]string{
-						"openshift.io/description":  pName,
-						"openshift.io/display-name": pDesc,
+						"openshift.io/display-name": pName,
+						"openshift.io/description":  pDesc,
 						"openshift.io/requester":    pRequester,
 					},
 				},

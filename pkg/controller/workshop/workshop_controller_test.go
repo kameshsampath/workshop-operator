@@ -71,6 +71,18 @@ func TestWorkshopController(t *testing.T) {
 
 	// Create a fake client to mock API calls.
 	cl := fake.NewFakeClient(objs...)
+	defaultOAuth := &oauthv1.OAuth{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: oauthv1.OAuthSpec{IdentityProviders: []oauthv1.IdentityProvider{}},
+	}
+
+	err := cl.Create(context.TODO(), defaultOAuth)
+	if err != nil {
+		t.Fatalf("Error intializing test (%v)", err)
+	}
+
 	// Create a ReconcileWorkshop object with the scheme and fake client.
 	r := &ReconcileWorkshop{client: cl, scheme: s}
 
@@ -87,28 +99,43 @@ func TestWorkshopController(t *testing.T) {
 
 	//Check project has been created
 	for i := 0; i <= 5; i++ {
+		projectName := fmt.Sprintf("%s-%d", workshop.Spec.Project.Prefixes[0], i)
+
 		p := &projectv1.Project{}
-		err := cl.Get(context.TODO(), types.NamespacedName{Name: fmt.Sprintf("tutorial-%d", i)}, p)
+
+		err := cl.Get(context.TODO(), types.NamespacedName{Name: projectName}, p)
+
 		if err != nil {
 			t.Fatalf("get projects: (%v)", err)
 		}
 
-		//TODO Check annotations
+		annotations := p.ObjectMeta.Annotations
+		expectedDesc := fmt.Sprintf("Project %s", projectName)
+		expectedRequester := fmt.Sprintf("%s%02d", workshop.Spec.User.Prefix, i)
+
+		if actualDisplayName := annotations["openshift.io/display-name"]; actualDisplayName != projectName {
+			t.Errorf("Expected Project Display Name: %s but got: %s ", actualDisplayName, projectName)
+		}
+
+		if actualDesc := annotations["openshift.io/description"]; actualDesc != expectedDesc {
+			t.Errorf("Expected Project Desc: %s but got: %s ", expectedDesc, actualDesc)
+		}
+
+		if actualRequester := annotations["openshift.io/requester"]; actualRequester != expectedRequester {
+			t.Errorf("Expected Project Desc: %s but got: %s ", expectedRequester, actualRequester)
+		}
 
 	}
-
-	refresh(t, r, req)
 
 	htps := &corev1.Secret{}
 
 	//Check htpass-bcrypt secret has been created
-	err := cl.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-config", Name: "htpass-bcrypt"}, htps)
+	err = cl.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-config", Name: "htpass-bcrypt"}, htps)
 
 	if err != nil {
 		t.Fatalf("get secrets: (%v)", err)
 	}
 
-	refresh(t, r, req)
 	o := &oauthv1.OAuth{}
 
 	err = cl.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, o)
@@ -118,7 +145,19 @@ func TestWorkshopController(t *testing.T) {
 	}
 
 	if len(o.Spec.IdentityProviders) != 1 {
-		t.Fatal("oauth identity providers not present", err)
+		t.Errorf("Expect 1 oauth identity providers but got zero (%v) ", err)
+	}
+
+	idp := o.Spec.IdentityProviders[0]
+
+	expectedIdpName := "htpasswd"
+	expectedIdpFileData := "htpass-bcrypt"
+
+	if actualIdpName := idp.Name; actualIdpName != expectedIdpName {
+		t.Errorf("Expected IDP Name: %s but got: %s", expectedIdpName, actualIdpName)
+	}
+	if actualIdpFileData := idp.IdentityProviderConfig.HTPasswd.FileData.Name; actualIdpFileData != expectedIdpFileData {
+		t.Errorf("Expected IDP Provider Data Name: %s but got: %s", expectedIdpName, actualIdpFileData)
 	}
 }
 
