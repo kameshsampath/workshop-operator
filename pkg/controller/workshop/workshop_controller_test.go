@@ -3,6 +3,7 @@ package workshop
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,11 +14,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	workshopv1alpha1 "github.com/kameshsampath/workshop-operator/pkg/apis/kameshs/v1alpha1"
+	"github.com/kameshsampath/workshop-operator/pkg/create"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 
 	oauthv1 "github.com/openshift/api/config/v1"
 	projectv1 "github.com/openshift/api/project/v1"
+	userv1 "github.com/openshift/api/user/v1"
+	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
 	corev1 "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
 )
 
 func TestWorkshopController(t *testing.T) {
@@ -49,7 +54,37 @@ func TestWorkshopController(t *testing.T) {
 				Password:      "openshift",
 				AdminPassword: "openshift",
 			},
-			Stack: workshopv1alpha1.WorkshopStack{},
+			Stack: workshopv1alpha1.WorkshopStack{
+				Community: []workshopv1alpha1.PackageInfo{
+					workshopv1alpha1.PackageInfo{
+						Name:     "knative-serving",
+						Operator: "knative-serving-operator",
+						Version:  "0.7.1",
+					},
+					workshopv1alpha1.PackageInfo{
+						Name:     "pipelines",
+						Operator: "openshift-pipelines-operator",
+						Version:  "0.5.2",
+					},
+				},
+				RedHat: []workshopv1alpha1.PackageInfo{
+					workshopv1alpha1.PackageInfo{
+						Name:     "elastic-search",
+						Operator: "elasticsearch-operator",
+						Version:  "4.1.15-201909041605",
+					},
+					workshopv1alpha1.PackageInfo{
+						Name:     "jaeger",
+						Operator: "jaeger-product",
+						Version:  "1.13.1",
+					},
+					workshopv1alpha1.PackageInfo{
+						Name:     "kiali",
+						Operator: "kiali-ossm",
+						Version:  "1.0.5",
+					},
+				},
+			},
 		},
 	}
 
@@ -61,6 +96,10 @@ func TestWorkshopController(t *testing.T) {
 	oauth := &oauthv1.OAuth{}
 	secret := &corev1.Secret{}
 	project := &projectv1.Project{}
+	clusterRole := &rbac.ClusterRole{}
+	clusterRoleBinding := &rbac.ClusterRoleBinding{}
+	userGroup := &userv1.Group{}
+	csc := &marketplacev2.CatalogSourceConfig{}
 
 	// Register operator types with the runtime scheme.
 	s := scheme.Scheme
@@ -68,6 +107,10 @@ func TestWorkshopController(t *testing.T) {
 	s.AddKnownTypes(projectv1.SchemeGroupVersion, project)
 	s.AddKnownTypes(oauthv1.SchemeGroupVersion, oauth)
 	s.AddKnownTypes(corev1.SchemeGroupVersion, secret)
+	s.AddKnownTypes(rbac.SchemeGroupVersion, clusterRole)
+	s.AddKnownTypes(rbac.SchemeGroupVersion, clusterRoleBinding)
+	s.AddKnownTypes(userv1.SchemeGroupVersion, userGroup)
+	s.AddKnownTypes(marketplacev2.SchemeGroupVersion, csc)
 
 	// Create a fake client to mock API calls.
 	cl := fake.NewFakeClient(objs...)
@@ -98,7 +141,7 @@ func TestWorkshopController(t *testing.T) {
 	refresh(t, r, req)
 
 	//Check project has been created
-	for i := 0; i <= 5; i++ {
+	for i := workshop.Spec.User.Start; i <= workshop.Spec.User.End; i++ {
 		projectName := fmt.Sprintf("%s-%d", workshop.Spec.Project.Prefixes[0], i)
 
 		p := &projectv1.Project{}
@@ -150,14 +193,71 @@ func TestWorkshopController(t *testing.T) {
 
 	idp := o.Spec.IdentityProviders[0]
 
-	expectedIdpName := "htpasswd"
-	expectedIdpFileData := "htpass-bcrypt"
+	expectedIdpName := create.OAuthIdentityProviderName
+	expectedIdpFileData := create.HtpassSecretName
 
 	if actualIdpName := idp.Name; actualIdpName != expectedIdpName {
 		t.Errorf("Expected IDP Name: %s but got: %s", expectedIdpName, actualIdpName)
 	}
 	if actualIdpFileData := idp.IdentityProviderConfig.HTPasswd.FileData.Name; actualIdpFileData != expectedIdpFileData {
 		t.Errorf("Expected IDP Provider Data Name: %s but got: %s", expectedIdpName, actualIdpFileData)
+	}
+
+	ug := &userv1.Group{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.GroupName}, ug)
+
+	if err != nil {
+		t.Fatalf("get user group: (%v)", err)
+	}
+	var eug = []string{}
+
+	for i := workshop.Spec.User.Start; i <= workshop.Spec.User.End; i++ {
+		userName := fmt.Sprintf("%s%02d", workshop.Spec.User.Prefix, i)
+		eug = append(eug, userName)
+	}
+	expectedUsersInGroup := userv1.OptionalNames(eug)
+	actualUsersInGroup := ug.Users
+
+	if !reflect.DeepEqual(expectedUsersInGroup, actualUsersInGroup) {
+		t.Errorf("Expect Users in Group: (%v) but got : (%v)  ", expectedUsersInGroup, actualUsersInGroup)
+	}
+
+	cr := &rbac.ClusterRole{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.RoleName}, cr)
+
+	if err != nil {
+		t.Fatalf("get cluster role: (%v)", err)
+	}
+
+	crb := &rbac.ClusterRoleBinding{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.RoleName}, crb)
+
+	if err != nil {
+		t.Fatalf("get cluster role binding: (%v)", err)
+	}
+
+	rhcsc := &marketplacev2.CatalogSourceConfig{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-marketplace", Name: create.RHPackagesCSC}, rhcsc)
+
+	if err != nil {
+		t.Fatalf("get rh catalogsource configs: (%v)", err)
+	}
+
+	expectedPackages := "elasticsearch-operator,jaeger-product,kiali-ossm"
+	if pkgNames := rhcsc.Spec.Packages; expectedPackages != pkgNames {
+		t.Errorf("RH Expecting packages : (%s) but got (%s) ", pkgNames, expectedPackages)
+	}
+
+	ccsc := &marketplacev2.CatalogSourceConfig{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-marketplace", Name: create.CommunityPackagesCSC}, ccsc)
+
+	if err != nil {
+		t.Fatalf("get community catalogsource configs: (%v)", err)
+	}
+
+	expectedPackages = "knative-serving-operator,openshift-pipelines-operator"
+	if pkgNames := ccsc.Spec.Packages; expectedPackages != pkgNames {
+		t.Errorf("Community Expecting packages : (%s) but got (%s) ", pkgNames, expectedPackages)
 	}
 }
 

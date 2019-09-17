@@ -12,9 +12,12 @@ import (
 )
 
 const (
-	HtpassSecretName          = "htpass-bcrypt"
-	HtpassSecretNamespace     = "openshift-config"
-	oAuthIdentityProviderName = "htpasswd"
+	//HtpassSecretName  the secret used for htpasswd idp
+	HtpassSecretName = "htpass-bcrypt"
+	//HtpassSecretNamespace - the namesapce where HtpassSecretName will be created
+	HtpassSecretNamespace = "openshift-config"
+	//OAuthIdentityProviderName  the OAuth Provider name
+	OAuthIdentityProviderName = "htpasswd"
 )
 
 //WorkshopUsers - creates the workshop users in OpenShift
@@ -38,7 +41,7 @@ func WorkshopUsers(spec workshopv1alpha1.WorkshopSpec) (*oauthv1.OAuth, *corev1.
 
 	idps := []oauthv1.IdentityProvider{
 		oauthv1.IdentityProvider{
-			Name:          oAuthIdentityProviderName,
+			Name:          OAuthIdentityProviderName,
 			MappingMethod: oauthv1.MappingMethodAdd,
 			IdentityProviderConfig: oauthv1.IdentityProviderConfig{
 				Type: oauthv1.IdentityProviderTypeHTPasswd,

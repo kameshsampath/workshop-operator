@@ -2,6 +2,7 @@ package workshop
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/kameshsampath/workshop-operator/pkg/create"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -104,7 +105,23 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &rbac.ClusterRole{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
+
 	err = c.Watch(&source.Kind{Type: &rbac.RoleBinding{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &rbac.ClusterRoleBinding{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &workshopv1alpha1.Workshop{},
 	})
@@ -121,6 +138,14 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &userv1.User{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &userv1.Group{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &workshopv1alpha1.Workshop{},
 	})
@@ -216,6 +241,82 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 		}
 
 		controllerutil.SetControllerReference(workshop, oauth, r.scheme)
+	}
+
+	//Workshop Student Group
+
+	workshopStudentGroup := create.WorkshopStudentGroup(workshop.Spec)
+
+	err = r.client.Get(context.TODO(),
+		types.NamespacedName{Name: create.GroupName}, workshopStudentGroup)
+
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating Workshop Students Group")
+		err = r.client.Create(context.TODO(), workshopStudentGroup)
+	} else {
+		reqLogger.Info("Updating Workshop Students Group")
+		err = r.client.Update(context.TODO(), workshopStudentGroup)
+	}
+
+	if err != nil {
+		return reconcile.Result{Requeue: true}, err
+	}
+
+	controllerutil.SetControllerReference(workshop, workshopStudentGroup, r.scheme)
+
+	//Workshop Student Role
+	workshopStudentRole := create.WorkshopStudentRole()
+
+	err = r.client.Get(context.TODO(),
+		types.NamespacedName{Name: create.RoleName}, workshopStudentRole)
+
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating Workshop Students Role")
+		err = r.client.Create(context.TODO(), workshopStudentRole)
+	}
+
+	if err != nil {
+		return reconcile.Result{Requeue: true}, err
+	}
+
+	controllerutil.SetControllerReference(workshop, workshopStudentRole, r.scheme)
+
+	//Workshop Student RoleBinding
+	workshopStudentRoleB := create.WorkshopStudentRoleBinding()
+
+	err = r.client.Get(context.TODO(),
+		types.NamespacedName{Name: create.RoleName}, workshopStudentRoleB)
+
+	if err != nil && errors.IsNotFound(err) {
+		reqLogger.Info("Creating Workshop Students Role")
+		err = r.client.Create(context.TODO(), workshopStudentRoleB)
+	}
+
+	if err != nil {
+		return reconcile.Result{Requeue: true}, err
+	}
+
+	controllerutil.SetControllerReference(workshop, workshopStudentRoleB, r.scheme)
+
+	//Create the CatalogSource Config
+	stackCSCs := create.WorkshopOperatorsCatalog(workshop.Spec)
+
+	for _, csc := range stackCSCs {
+		err = r.client.Get(context.TODO(),
+			types.NamespacedName{Name: csc.Name}, csc)
+
+		if err != nil && errors.IsNotFound(err) {
+			reqLogger.Info(fmt.Sprintf("Creating CatalogSourceConfig : %s", csc.Name))
+			err = r.client.Create(context.TODO(), csc)
+		} else {
+			reqLogger.Info(fmt.Sprintf("Creating CatalogSourceConfig : %s", csc.Name))
+			err = r.client.Create(context.TODO(), csc)
+		}
+
+		if err != nil {
+			return reconcile.Result{Requeue: true}, err
+		}
+		controllerutil.SetControllerReference(workshop, csc, r.scheme)
 	}
 
 	return reconcile.Result{}, nil

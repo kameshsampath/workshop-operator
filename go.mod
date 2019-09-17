@@ -1,8 +1,10 @@
 module github.com/kameshsampath/workshop-operator
 
 require (
+	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/spec v0.19.0
 	github.com/openshift/api v3.9.0+incompatible
+	github.com/operator-framework/operator-marketplace v0.0.0-20190912222040-fff7b83b4e24
 	github.com/operator-framework/operator-sdk v0.10.1-0.20190912205659-c084b570a6af
 	github.com/spf13/pflag v1.0.3
 	golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7
