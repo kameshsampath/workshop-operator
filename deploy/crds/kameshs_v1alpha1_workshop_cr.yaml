@@ -18,12 +18,12 @@ spec:
     start: 0
     end: 6
   stack:
-    install: false
+    install: true
     che:
       version: 7.1.0
     community:
       - name: "knative-serving"
-        operator: "knative-serving-operator"
+        operator: "knative-eventing-operator"
         version: "0.7.1"
       - name: "knative-eventing"
         operator: "knative-eventing-operator"

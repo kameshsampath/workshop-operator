@@ -9,6 +9,8 @@ import (
 )
 
 const (
+	//CSCNS the namespace where Catalog Source Config will be created
+	CSCNS string = "openshift-marketplace"
 	//RHPackagesCSC the Red Hat Operators CSC
 	RHPackagesCSC string = "rhd-workshop-packages"
 	//CommunityPackagesCSC the Community Operators CSC
@@ -28,7 +30,7 @@ func WorkshopOperatorsCatalog(spec workshopv1alpha1.WorkshopSpec) []*marketplace
 	cscs = append(cscs, &marketplacev2.CatalogSourceConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      RHPackagesCSC,
-			Namespace: "openshift-marketplace",
+			Namespace: CSCNS,
 		},
 		Spec: marketplacev2.CatalogSourceConfigSpec{
 			TargetNamespace: "openshift-operators",
@@ -46,11 +48,11 @@ func WorkshopOperatorsCatalog(spec workshopv1alpha1.WorkshopSpec) []*marketplace
 	cscs = append(cscs, &marketplacev2.CatalogSourceConfig{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CommunityPackagesCSC,
-			Namespace: "openshift-marketplace",
+			Namespace: CSCNS,
 		},
 		Spec: marketplacev2.CatalogSourceConfigSpec{
 			TargetNamespace: "openshift-operators",
-			Source:          "redhat-operators",
+			Source:          "community-operators",
 			Packages:        strings.Join(communityOperatorPkgs, ","),
 		},
 	})

@@ -22,6 +22,10 @@ import (
 	userv1 "github.com/openshift/api/user/v1"
 	rbac "k8s.io/api/rbac/v1"
 
+	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
+	olmv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
+	marketplace "github.com/operator-framework/operator-marketplace/pkg/apis"
+	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -66,6 +70,19 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 
 	if err := rbac.AddToScheme(m.GetScheme()); err != nil {
 		log.Error(err, "Failed to add RBAC to scheme")
+	}
+
+	if err := marketplace.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Failed to add marketplace to scheme")
+
+	}
+
+	if err := olmv1alpha1.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Failed to add olmv1alpha1 to scheme")
+	}
+
+	if err := olmv1.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Failed to add olmv1 to scheme")
 	}
 
 	//Watch for changes on Primary resource Workshop
@@ -163,29 +180,29 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// err = c.Watch(&source.Kind{Type: &marketplacev2.CatalogSourceConfig{}}, &handler.EnqueueRequestForOwner{
-	// 	IsController: true,
-	// 	OwnerType:    &workshopv1alpha1.Workshop{},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	err = c.Watch(&source.Kind{Type: &marketplacev2.CatalogSourceConfig{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
 
-	// err = c.Watch(&source.Kind{Type: &olmv1.Subscription{}}, &handler.EnqueueRequestForOwner{
-	// 	IsController: true,
-	// 	OwnerType:    &workshopv1alpha1.Workshop{},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	err = c.Watch(&source.Kind{Type: &olmv1alpha1.Subscription{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
 
-	// err = c.Watch(&source.Kind{Type: &olmv1.OperatorGroup{}}, &handler.EnqueueRequestForOwner{
-	// 	IsController: true,
-	// 	OwnerType:    &workshopv1alpha1.Workshop{},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	err = c.Watch(&source.Kind{Type: &olmv1.OperatorGroup{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -360,9 +377,9 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 
 	for _, csc := range stackCSCs {
 		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: csc.Name}, csc)
+			types.NamespacedName{Name: csc.Name, Namespace: create.CSCNS}, csc)
 
-		if err != nil {
+		if err != nil && errors.IsNotFound(err) {
 			reqLogger.Info(fmt.Sprintf("Creating CatalogSourceConfig : %s", csc.Name))
 			err = r.client.Create(context.TODO(), csc)
 			if err != nil {
@@ -423,7 +440,7 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 
 		cheCSC := create.CheCatalogSourceConfig()
 		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheCSCName, Namespace: "openshift-marketplace"}, cheCSC)
+			types.NamespacedName{Name: create.CheCSCName, Namespace: create.CSCNS}, cheCSC)
 
 		if err != nil && errors.IsNotFound(err) {
 			reqLogger.Info("Creating Che CatalogSource Config")

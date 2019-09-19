@@ -8,6 +8,7 @@ import (
 	chev1 "github.com/eclipse/che-operator/pkg/apis/org/v1"
 	workshopv1alpha1 "github.com/kameshsampath/workshop-operator/pkg/apis/kameshs/v1alpha1"
 	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
+	olmv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
 	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
 )
 
@@ -64,13 +65,13 @@ func CheOperatorGroup() *olmv1.OperatorGroup {
 }
 
 //CheSubscription Creates the Eclipse Che Subscription
-func CheSubscription(spec workshopv1alpha1.WorkshopSpec) *olmv1.Subscription {
-	return &olmv1.Subscription{
+func CheSubscription(spec workshopv1alpha1.WorkshopSpec) *olmv1alpha1.Subscription {
+	return &olmv1alpha1.Subscription{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CheSubscriptionName,
 			Namespace: CheInstallNamespace,
 		},
-		Spec: &olmv1.SubscriptionSpec{
+		Spec: &olmv1alpha1.SubscriptionSpec{
 			Channel:                "stable",
 			Package:                "eclipse-che",
 			StartingCSV:            "eclipse-che.v" + spec.Stack.Che.CheVersion,

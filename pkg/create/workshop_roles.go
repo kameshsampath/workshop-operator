@@ -53,6 +53,7 @@ func WorkshopStudentRole() *rbac.ClusterRole {
 		},
 		Rules: []rbac.PolicyRule{
 			rbac.PolicyRule{
+				APIGroups: []string{rbac.APIGroupAll},
 				Resources: []string{"configmaps", "services"},
 				Verbs:     []string{"get", "view"},
 			},

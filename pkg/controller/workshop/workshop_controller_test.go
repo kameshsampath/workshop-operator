@@ -22,6 +22,7 @@ import (
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
+	olmv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
 	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -109,7 +110,7 @@ func TestWorkshopController(t *testing.T) {
 	userGroup := &userv1.Group{}
 	csc := &marketplacev2.CatalogSourceConfig{}
 	og := &olmv1.OperatorGroup{}
-	sub := &olmv1.Subscription{}
+	sub := &olmv1alpha1.Subscription{}
 	cheC := &chev1.CheCluster{}
 
 	// Register operator types with the runtime scheme.
@@ -186,8 +187,8 @@ func TestWorkshopController(t *testing.T) {
 
 	htps := &corev1.Secret{}
 
-	//Check htpass-bcrypt secret has been created
-	err = cl.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-config", Name: "htpass-bcrypt"}, htps)
+	//Check htpass-rhd-workshop secret has been created
+	err = cl.Get(context.TODO(), types.NamespacedName{Namespace: "openshift-config", Name: "htpass-rhd-workshop"}, htps)
 
 	if err != nil {
 		t.Fatalf("get secrets: (%v)", err)
@@ -314,7 +315,7 @@ func TestWorkshopController(t *testing.T) {
 		t.Fatalf("get che operator group name: (%v)", err)
 	}
 
-	cheSub := &olmv1.Subscription{}
+	cheSub := &olmv1alpha1.Subscription{}
 	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, cheSub)
 	if err != nil {
 		t.Fatalf("get che subscription  name: (%v)", err)
