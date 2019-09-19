@@ -11,7 +11,7 @@ spec:
     prefixes:
       - tutorial
   user:
-    create: true
+    create: false
     prefix: "user"
     password: "banana"
     adminPassword: "j@ckF6uit"
@@ -20,6 +20,8 @@ spec:
   stack:
     install: true
     che:
+      tlssupport: true
+      selfsignedcert: false
       version: 7.1.0
     community:
       - name: "knative-serving"

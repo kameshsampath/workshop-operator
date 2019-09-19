@@ -7,7 +7,8 @@ import (
 
 	chev1 "github.com/eclipse/che-operator/pkg/apis/org/v1"
 	workshopv1alpha1 "github.com/kameshsampath/workshop-operator/pkg/apis/kameshs/v1alpha1"
-	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
+	util "github.com/kameshsampath/workshop-operator/pkg/util"
+	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1"
 	olmv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
 	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
 )
@@ -32,6 +33,7 @@ func CheProject() *projectv1.Project {
 				"openshift.io/display-name": "Eclipse Che",
 				"openshift.io/description":  "Project where Eclipse Che components are installed",
 			},
+			Labels: util.WorkshopLabels(),
 		},
 	}
 }
@@ -42,6 +44,7 @@ func CheCatalogSourceConfig() *marketplacev2.CatalogSourceConfig {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CheCSCName,
 			Namespace: "openshift-marketplace",
+			Labels:    util.WorkshopLabels(),
 		},
 		Spec: marketplacev2.CatalogSourceConfigSpec{
 			TargetNamespace: CheInstallNamespace,
@@ -57,6 +60,7 @@ func CheOperatorGroup() *olmv1.OperatorGroup {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CheOperatorGroupName,
 			Namespace: CheInstallNamespace,
+			Labels:    util.WorkshopLabels(),
 		},
 		Spec: olmv1.OperatorGroupSpec{
 			TargetNamespaces: []string{CheInstallNamespace},
@@ -70,12 +74,14 @@ func CheSubscription(spec workshopv1alpha1.WorkshopSpec) *olmv1alpha1.Subscripti
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CheSubscriptionName,
 			Namespace: CheInstallNamespace,
+			Labels:    util.WorkshopLabels(),
 		},
 		Spec: &olmv1alpha1.SubscriptionSpec{
 			Channel:                "stable",
 			Package:                "eclipse-che",
 			StartingCSV:            "eclipse-che.v" + spec.Stack.Che.CheVersion,
-			CatalogSourceNamespace: CheCSCName,
+			CatalogSource:          CheCSCName,
+			CatalogSourceNamespace: CheInstallNamespace,
 		},
 	}
 }
@@ -87,6 +93,7 @@ func CheCluster(spec workshopv1alpha1.WorkshopSpec) *chev1.CheCluster {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      CheSubscriptionName,
 			Namespace: CheInstallNamespace,
+			Labels:    util.WorkshopLabels(),
 		},
 		Spec: chev1.CheClusterSpec{
 			Server: chev1.CheClusterSpecServer{

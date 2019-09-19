@@ -9,6 +9,7 @@ import (
 
 	oauthv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -19,6 +20,8 @@ const (
 	HtpassSecretNamespace string = "openshift-config"
 	//OAuthIdentityProviderName  the OAuth Provider name
 	OAuthIdentityProviderName string = "htpasswd"
+	//OcpAdminRoleName is the role name that will be used for cluster-admin ocpadmin
+	OcpAdminRoleName string = "ocpadmin-cluster-admin"
 )
 
 //WorkshopUsers - creates the workshop users in OpenShift
@@ -55,6 +58,28 @@ func WorkshopUsers(spec workshopv1alpha1.WorkshopSpec) ([]oauthv1.IdentityProvid
 	}
 
 	return idps, htpassSecret, nil
+}
+
+//OcpAdminRoleBinding is cluster-admin who wil be created
+func OcpAdminRoleBinding() *rbac.ClusterRoleBinding {
+	return &rbac.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   OcpAdminRoleName,
+			Labels: util.WorkshopLabels(),
+		},
+		RoleRef: rbac.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Name:     "cluster-admin",
+			Kind:     "ClusterRole",
+		},
+		Subjects: []rbac.Subject{
+			rbac.Subject{
+				APIGroup: "rbac.authorization.k8s.io",
+				Kind:     "User",
+				Name:     "ocpadmin",
+			},
+		},
+	}
 }
 
 func generateUserHashes(u workshopv1alpha1.WorkshopUser) (string, error) {

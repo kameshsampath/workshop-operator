@@ -15,8 +15,7 @@ spec:
       serviceAccountName: workshop-operator
       containers:
         - name: workshop-operator
-          # Replace this with the built image name
-          image: REPLACE_IMAGE
+          image: "quay.io/workspace7/workshop-operator:v0.0.1"
           command:
           - workshop-operator
           imagePullPolicy: Always

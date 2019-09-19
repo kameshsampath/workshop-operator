@@ -1,0 +1,60 @@
+= Red Hat Developers Workshop Operator
+
+A Kubernetes Operator to prepare the OpenShift workshop infrastructure for running Red Hat Developers Workshops
+
+[IMPORTANT]
+====
+The Operator is under development and may undergo rapid changes
+====
+
+== Deploy
+
+[source,bash,subs="attributes+,+macros"]
+----
+oc new-project rhd-workshop-infra
+oc apply -n rhd-workshop-infra -f deploy/service_account.yaml
+oc apply -n rhd-workshop-infra -f deploy/role.yaml
+oc apply -n rhd-workshop-infra -f deploy/role_binding.yaml
+oc apply -n rhd-workshop-infra -f deploy/crds/kameshs_v1alpha1_workshop_crd.yaml
+oc apply -n rhd-workshop-infra -f deploy/operator.yaml
+----
+
+== Custom Resource(CR) Attributes
+
+NOTE: more details will be added soon
+
+== stacks
+
+The software packages to install, by default Eclipse Che will be installed.
+
+[NOTE]
+====
+All software packages will be installed using Kubernetes Operators. Please check https://operatorhub.io[Operator Hub] for more information
+====
+
+`che_version`: The Eclipse Che version to be used.
+`install`: Whether to install the software stacks or not, defaults to `true`
+
+The stacks divided based on `community` and `redhat` operators
+
+=== **community** 
+
+The operator uses **community-operators** as the source for the following packages:
+
+  * `knative-serving`
+  * `knative-eventing`
+  * `openshift-pipelines`
+
+
+=== **redhat**
+
+The operator uses **redhat-operators** as the source for the following packages:
+   
+   * `elastic-search`
+   * `jaeger`
+   * `kiali`
+   * `servicemesh`
+
+== Create a custom resource (CR)
+
+Create an custom resource called **Workshop**, checkout the link:./deploy/crds/kameshs_v1alpha1_workshop_cr.yaml[Example]

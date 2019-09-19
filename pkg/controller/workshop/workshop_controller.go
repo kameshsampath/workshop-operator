@@ -17,12 +17,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	osappsv1 "github.com/openshift/api/apps/v1"
 	oauthv1 "github.com/openshift/api/config/v1"
+	isv1 "github.com/openshift/api/image/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
 	rbac "k8s.io/api/rbac/v1"
 
-	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
+	chev1 "github.com/eclipse/che-operator/pkg/apis"
+	cheorgv1 "github.com/eclipse/che-operator/pkg/apis/org/v1"
+	olm "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
+	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1"
 	olmv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators/v1alpha1"
 	marketplace "github.com/operator-framework/operator-marketplace/pkg/apis"
 	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
@@ -66,6 +71,14 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 		log.Error(err, "Error adding OpenShift OAuth API to scheme")
 	}
 
+	if err := osappsv1.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Error adding OpenShift Apps to scheme")
+	}
+
+	if err := isv1.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Error adding OpenShift Apps to scheme")
+	}
+
 	// register RBAC in the scheme
 
 	if err := rbac.AddToScheme(m.GetScheme()); err != nil {
@@ -77,12 +90,20 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 
 	}
 
+	if err := olm.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Failed to add olm to scheme")
+	}
+
 	if err := olmv1alpha1.AddToScheme(m.GetScheme()); err != nil {
-		log.Error(err, "Failed to add olmv1alpha1 to scheme")
+		log.Error(err, "Failed to add olmv1 to scheme")
 	}
 
 	if err := olmv1.AddToScheme(m.GetScheme()); err != nil {
 		log.Error(err, "Failed to add olmv1 to scheme")
+	}
+
+	if err := chev1.AddToScheme(m.GetScheme()); err != nil {
+		log.Error(err, "Failed to add Eclipse Che Cluster to scheme")
 	}
 
 	//Watch for changes on Primary resource Workshop
@@ -93,6 +114,14 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &osappsv1.DeploymentConfig{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &workshopv1alpha1.Workshop{},
 	})
@@ -180,6 +209,14 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	err = c.Watch(&source.Kind{Type: &isv1.ImageStream{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
+
 	err = c.Watch(&source.Kind{Type: &marketplacev2.CatalogSourceConfig{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &workshopv1alpha1.Workshop{},
@@ -197,6 +234,14 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(&source.Kind{Type: &olmv1.OperatorGroup{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &workshopv1alpha1.Workshop{},
+	})
+	if err != nil {
+		return err
+	}
+
+	err = c.Watch(&source.Kind{Type: &cheorgv1.CheCluster{}}, &handler.EnqueueRequestForOwner{
 		IsController: true,
 		OwnerType:    &workshopv1alpha1.Workshop{},
 	})
@@ -311,6 +356,24 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 				return reconcile.Result{Requeue: true}, err
 			}
 		}
+
+		//OCP Admin
+		ocpadminRoleB := create.WorkshopStudentRoleBinding()
+
+		err = r.client.Get(context.TODO(),
+			types.NamespacedName{Name: create.OcpAdminRoleName}, ocpadminRoleB)
+
+		if err != nil && errors.IsNotFound(err) {
+			reqLogger.Info("Creating Cluster Admin Role")
+			err = r.client.Create(context.TODO(), ocpadminRoleB)
+		}
+
+		if err != nil {
+			return reconcile.Result{Requeue: true}, err
+		}
+
+		controllerutil.SetControllerReference(workshop, ocpadminRoleB, r.scheme)
+
 		//Workshop Student Group
 
 		workshopStudentGroup := create.WorkshopStudentGroup(workshop.Spec)
@@ -398,9 +461,27 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 
 	if workshop.Spec.Stack.Install {
 		//Install Nexus
-		nexus := create.Nexus()
+
+		nexusIS := create.NexusImageStream()
+		is := &isv1.ImageStream{}
+
 		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, nexus)
+			types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, is)
+
+		if err != nil && errors.IsNotFound(err) {
+			reqLogger.Info("Creating Nexus Image Stream")
+			err = r.client.Create(context.TODO(), nexusIS)
+			if err != nil {
+				return reconcile.Result{Requeue: true}, err
+			}
+			controllerutil.SetControllerReference(workshop, nexusIS, r.scheme)
+		}
+
+		nexus := create.Nexus()
+		ndc := &osappsv1.DeploymentConfig{}
+
+		err = r.client.Get(context.TODO(),
+			types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, ndc)
 
 		if err != nil && errors.IsNotFound(err) {
 			reqLogger.Info("Deploying Nexus")
@@ -410,6 +491,7 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 			}
 			controllerutil.SetControllerReference(workshop, nexus, r.scheme)
 		}
+
 		//Nexus Service
 		nexusSvc := create.NexusService()
 		err = r.client.Get(context.TODO(),
@@ -478,11 +560,13 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 		}
 
 		che := create.CheCluster(workshop.Spec)
+		eche := &cheorgv1.CheCluster{}
+
 		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, che)
+			types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, eche)
 
 		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Che Che Cluster")
+			reqLogger.Info("Creating Che Cluster")
 			err = r.client.Create(context.TODO(), che)
 			if err != nil {
 				return reconcile.Result{Requeue: true}, err
