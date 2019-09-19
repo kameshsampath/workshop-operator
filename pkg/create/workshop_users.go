@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	workshopv1alpha1 "github.com/kameshsampath/workshop-operator/pkg/apis/kameshs/v1alpha1"
+	util "github.com/kameshsampath/workshop-operator/pkg/util"
 	"golang.org/x/crypto/bcrypt"
 
 	oauthv1 "github.com/openshift/api/config/v1"
@@ -13,15 +14,15 @@ import (
 
 const (
 	//HtpassSecretName  the secret used for htpasswd idp
-	HtpassSecretName = "htpass-bcrypt"
+	HtpassSecretName string = "htpass-rhd-workshop"
 	//HtpassSecretNamespace - the namesapce where HtpassSecretName will be created
-	HtpassSecretNamespace = "openshift-config"
+	HtpassSecretNamespace string = "openshift-config"
 	//OAuthIdentityProviderName  the OAuth Provider name
-	OAuthIdentityProviderName = "htpasswd"
+	OAuthIdentityProviderName string = "htpasswd"
 )
 
 //WorkshopUsers - creates the workshop users in OpenShift
-func WorkshopUsers(spec workshopv1alpha1.WorkshopSpec) (*oauthv1.OAuth, *corev1.Secret, error) {
+func WorkshopUsers(spec workshopv1alpha1.WorkshopSpec) ([]oauthv1.IdentityProvider, *corev1.Secret, error) {
 
 	userHashes, err := generateUserHashes(spec.User)
 
@@ -33,6 +34,7 @@ func WorkshopUsers(spec workshopv1alpha1.WorkshopSpec) (*oauthv1.OAuth, *corev1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      HtpassSecretName,
 			Namespace: HtpassSecretNamespace,
+			Labels:    util.WorkshopLabels(),
 		},
 		Data: map[string][]byte{
 			"htpasswd": []byte(userHashes),
@@ -46,20 +48,13 @@ func WorkshopUsers(spec workshopv1alpha1.WorkshopSpec) (*oauthv1.OAuth, *corev1.
 			IdentityProviderConfig: oauthv1.IdentityProviderConfig{
 				Type: oauthv1.IdentityProviderTypeHTPasswd,
 				HTPasswd: &oauthv1.HTPasswdIdentityProvider{
-					FileData: oauthv1.SecretNameReference{Name: htpassSecret.ObjectMeta.Name},
+					FileData: oauthv1.SecretNameReference{Name: HtpassSecretName},
 				},
 			},
 		},
 	}
 
-	htpasswdIdp := &oauthv1.OAuth{
-		ObjectMeta: metav1.ObjectMeta{Name: "cluster"},
-		Spec: oauthv1.OAuthSpec{
-			IdentityProviders: idps,
-		},
-	}
-
-	return htpasswdIdp, htpassSecret, nil
+	return idps, htpassSecret, nil
 }
 
 func generateUserHashes(u workshopv1alpha1.WorkshopUser) (string, error) {

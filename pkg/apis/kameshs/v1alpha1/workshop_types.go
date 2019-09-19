@@ -16,16 +16,20 @@ type WorkshopUser struct {
 	Prefix        string `json:"prefix"`
 	Password      string `json:"password"`
 	AdminPassword string `json:"adminPassword"`
-	Start         int8   `json:"start"`
-	End           int8   `json:"end"`
+	//+kubebuilder:validation:Minimum=0
+	//+kubebuilder:validation:Maximum=1
+	Start int32 `json:"start"`
+	//+kubebuilder:validation:Minimum=1
+	//+kubebuilder:validation:Maximum=100
+	End int32 `json:"end"`
 }
 
 //WorkshopStack defines the software stack for the Workshop
 type WorkshopStack struct {
-	Install    bool          `json:"install"`
-	CheVersion string        `json:"cheVersion"`
-	Community  []PackageInfo `json:"community"`
-	RedHat     []PackageInfo `json:"redhat"`
+	Install   bool          `json:"install"`
+	Che       EclipseChe    `json:"che"`
+	Community []PackageInfo `json:"community"`
+	RedHat    []PackageInfo `json:"redhat"`
 }
 
 //PackageInfo defines the software package that will be installed using the operators
@@ -35,6 +39,13 @@ type PackageInfo struct {
 	Operator string `json:"operator"`
 }
 
+//EclipseChe configures few parameters for CR Eclipse Che Cluster
+type EclipseChe struct {
+	CheVersion     string `json:"version"`
+	TLSSupport     bool   `json:"tlssupport,omitempty"`
+	SelfSignedCert bool   `json:"selfsignedcert,omitempty"`
+}
+
 // WorkshopSpec defines the desired state of Workshop
 // +k8s:openapi-gen=true
 type WorkshopSpec struct {
@@ -42,7 +53,7 @@ type WorkshopSpec struct {
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book-v1.book.kubebuilder.io/beyond_basics/generating_crd.html
 	Clean              bool            `json:"clean"`
-	OpenshiftAPIServer string          `json:"openshiftAPIServer"`
+	OpenshiftAPIServer string          `json:"openshiftAPIServer,omitempty"`
 	Project            WorkshopProject `json:"project"`
 	User               WorkshopUser    `json:"user"`
 	Stack              WorkshopStack   `json:"stack"`

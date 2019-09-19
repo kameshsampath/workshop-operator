@@ -95,7 +95,7 @@ func schema_pkg_apis_kameshs_v1alpha1_WorkshopSpec(ref common.ReferenceCallback)
 						},
 					},
 				},
-				Required: []string{"clean", "openshiftAPIServer", "project", "user", "stack"},
+				Required: []string{"clean", "project", "user", "stack"},
 			},
 		},
 		Dependencies: []string{

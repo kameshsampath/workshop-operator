@@ -5,21 +5,22 @@ metadata:
   description: "Example Workshop"
 spec:
   clean: false
-  openShiftAPIServer: "oauth-openshift.openshift-authentication"
+  openshiftAPIServer: "oauth-openshift.openshift-authentication"
   project:
     create: true
     prefixes:
       - tutorial
-  users:
+  user:
     create: true
     prefix: "user"
     password: "banana"
     adminPassword: "j@ckF6uit"
     start: 0
-    end: 50
+    end: 6
   stack:
-    install: true
-    cheVersion: 7.1.0
+    install: false
+    che:
+      version: 7.1.0
     community:
       - name: "knative-serving"
         operator: "knative-serving-operator"

@@ -17,10 +17,13 @@ import (
 	"github.com/kameshsampath/workshop-operator/pkg/create"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 
+	chev1 "github.com/eclipse/che-operator/pkg/apis/org/v1"
 	oauthv1 "github.com/openshift/api/config/v1"
 	projectv1 "github.com/openshift/api/project/v1"
 	userv1 "github.com/openshift/api/user/v1"
+	olmv1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/apis/operators"
 	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 )
@@ -55,6 +58,11 @@ func TestWorkshopController(t *testing.T) {
 				AdminPassword: "openshift",
 			},
 			Stack: workshopv1alpha1.WorkshopStack{
+				Install: true,
+				Che: workshopv1alpha1.EclipseChe{
+					CheVersion: "7.1.0",
+					TLSSupport: true,
+				},
 				Community: []workshopv1alpha1.PackageInfo{
 					workshopv1alpha1.PackageInfo{
 						Name:     "knative-serving",
@@ -100,6 +108,9 @@ func TestWorkshopController(t *testing.T) {
 	clusterRoleBinding := &rbac.ClusterRoleBinding{}
 	userGroup := &userv1.Group{}
 	csc := &marketplacev2.CatalogSourceConfig{}
+	og := &olmv1.OperatorGroup{}
+	sub := &olmv1.Subscription{}
+	cheC := &chev1.CheCluster{}
 
 	// Register operator types with the runtime scheme.
 	s := scheme.Scheme
@@ -111,6 +122,9 @@ func TestWorkshopController(t *testing.T) {
 	s.AddKnownTypes(rbac.SchemeGroupVersion, clusterRoleBinding)
 	s.AddKnownTypes(userv1.SchemeGroupVersion, userGroup)
 	s.AddKnownTypes(marketplacev2.SchemeGroupVersion, csc)
+	s.AddKnownTypes(olmv1.SchemeGroupVersion, og)
+	s.AddKnownTypes(olmv1.SchemeGroupVersion, sub)
+	s.AddKnownTypes(chev1.SchemeGroupVersion, cheC)
 
 	// Create a fake client to mock API calls.
 	cl := fake.NewFakeClient(objs...)
@@ -258,6 +272,58 @@ func TestWorkshopController(t *testing.T) {
 	expectedPackages = "knative-serving-operator,openshift-pipelines-operator"
 	if pkgNames := ccsc.Spec.Packages; expectedPackages != pkgNames {
 		t.Errorf("Community Expecting packages : (%s) but got (%s) ", pkgNames, expectedPackages)
+	}
+
+	// Nexus Checks
+	nexus := &appsv1.Deployment{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, nexus)
+	if err != nil {
+		t.Fatalf("get nexus deployment: (%v)", err)
+	}
+
+	if actualImage := nexus.Spec.Template.Spec.Containers[0].Image; create.NexusImageName != actualImage {
+		t.Errorf("Expecting Nexus Image to be (%s) but got %s ", create.NexusImageName, actualImage)
+	}
+
+	nexusSvc := &corev1.Service{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, nexusSvc)
+	if err != nil {
+		t.Fatalf("get nexus service: (%v)", err)
+	}
+
+	if actualNexusSvcPort := nexusSvc.Spec.Ports[0].Port; 8081 != actualNexusSvcPort {
+		t.Errorf("Expecting Nexus Service to be 8081 but got %d ", actualNexusSvcPort)
+	}
+
+	//Che checks
+	cheProject := &projectv1.Project{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.CheInstallNamespace}, cheProject)
+	if err != nil {
+		t.Fatalf("get che project: (%v)", err)
+	}
+
+	cheCSC := &marketplacev2.CatalogSourceConfig{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.CheCSCName, Namespace: "openshift-marketplace"}, cheCSC)
+	if err != nil {
+		t.Fatalf("get che catalog source config name: (%v)", cheCSC)
+	}
+
+	cheOG := &olmv1.OperatorGroup{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.CheOperatorGroupName, Namespace: create.CheInstallNamespace}, cheOG)
+	if err != nil {
+		t.Fatalf("get che operator group name: (%v)", err)
+	}
+
+	cheSub := &olmv1.Subscription{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, cheSub)
+	if err != nil {
+		t.Fatalf("get che subscription  name: (%v)", err)
+	}
+
+	cheCluster := &chev1.CheCluster{}
+	err = cl.Get(context.TODO(), types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, cheCluster)
+	if err != nil {
+		t.Fatalf("get che cluster name: (%v)", err)
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	workshopv1alpha1 "github.com/kameshsampath/workshop-operator/pkg/apis/kameshs/v1alpha1"
+	util "github.com/kameshsampath/workshop-operator/pkg/util"
 
 	rbac "k8s.io/api/rbac/v1"
 
@@ -13,8 +14,10 @@ import (
 )
 
 const (
-	RoleName  = "workshop-student"
-	GroupName = "workshop-students"
+	//RoleName is the name of the role
+	RoleName string = "workshop-student"
+	//GroupName is the name of the groups
+	GroupName string = "workshop-students"
 )
 
 //WorkshopStudentGroup - the group that represents the Workshop students
@@ -32,7 +35,8 @@ func WorkshopStudentGroup(spec workshopv1alpha1.WorkshopSpec) *userv1.Group {
 
 	var group = &userv1.Group{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: GroupName,
+			Name:   GroupName,
+			Labels: util.WorkshopLabels(),
 		},
 		Users: userv1.OptionalNames(groupUsers),
 	}
@@ -44,11 +48,11 @@ func WorkshopStudentGroup(spec workshopv1alpha1.WorkshopSpec) *userv1.Group {
 func WorkshopStudentRole() *rbac.ClusterRole {
 	return &rbac.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: RoleName,
+			Name:   RoleName,
+			Labels: util.WorkshopLabels(),
 		},
 		Rules: []rbac.PolicyRule{
 			rbac.PolicyRule{
-				APIGroups: []string{""},
 				Resources: []string{"configmaps", "services"},
 				Verbs:     []string{"get", "view"},
 			},
@@ -60,9 +64,14 @@ func WorkshopStudentRole() *rbac.ClusterRole {
 func WorkshopStudentRoleBinding() *rbac.ClusterRoleBinding {
 	return &rbac.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: RoleName,
+			Name:   RoleName,
+			Labels: util.WorkshopLabels(),
 		},
-		RoleRef: rbac.RoleRef{},
+		RoleRef: rbac.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Name:     RoleName,
+			Kind:     "ClusterRole",
+		},
 		Subjects: []rbac.Subject{
 			rbac.Subject{
 				APIGroup: "rbac.authorization.k8s.io",

@@ -10,9 +10,9 @@ import (
 
 const (
 	//RHPackagesCSC the Red Hat Operators CSC
-	RHPackagesCSC = "rhd-workshop-packages"
+	RHPackagesCSC string = "rhd-workshop-packages"
 	//CommunityPackagesCSC the Community Operators CSC
-	CommunityPackagesCSC = "rhd-workshop-packages-community"
+	CommunityPackagesCSC string = "rhd-workshop-packages-community"
 )
 
 //WorkshopOperatorsCatalog creates the OperatorsCatalog for community-operators in workshop stack

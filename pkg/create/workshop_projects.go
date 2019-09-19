@@ -4,14 +4,15 @@ import (
 	"fmt"
 
 	workshopv1alpha1 "github.com/kameshsampath/workshop-operator/pkg/apis/kameshs/v1alpha1"
+	util "github.com/kameshsampath/workshop-operator/pkg/util"
 	projectv1 "github.com/openshift/api/project/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 //WorkshopProjects - creates the workshop projects in OpenShift
-func WorkshopProjects(spec workshopv1alpha1.WorkshopSpec) []projectv1.Project {
+func WorkshopProjects(spec workshopv1alpha1.WorkshopSpec) []*projectv1.Project {
 
-	var projects []projectv1.Project
+	var projects []*projectv1.Project
 	start := spec.User.Start
 	end := spec.User.End
 	prefixes := spec.Project.Prefixes
@@ -29,10 +30,11 @@ func WorkshopProjects(spec workshopv1alpha1.WorkshopSpec) []projectv1.Project {
 						"openshift.io/description":  pDesc,
 						"openshift.io/requester":    pRequester,
 					},
+					Labels: util.WorkshopLabels(),
 				},
 			}
 
-			projects = append(projects, *p)
+			projects = append(projects, p)
 		}
 	}
 

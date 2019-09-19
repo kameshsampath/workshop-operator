@@ -51,8 +51,17 @@ spec:
               type: object
             stack:
               properties:
-                cheVersion:
-                  type: string
+                che:
+                  properties:
+                    selfsignedcert:
+                      type: boolean
+                    tlssupport:
+                      type: boolean
+                    version:
+                      type: string
+                  required:
+                  - version
+                  type: object
                 community:
                   items:
                     properties:
@@ -87,7 +96,7 @@ spec:
                   type: array
               required:
               - install
-              - cheVersion
+              - che
               - community
               - redhat
               type: object
@@ -98,13 +107,19 @@ spec:
                 create:
                   type: boolean
                 end:
-                  type: byte
+                  format: int32
+                  maximum: 100
+                  minimum: 1
+                  type: integer
                 password:
                   type: string
                 prefix:
                   type: string
                 start:
-                  type: byte
+                  format: int32
+                  maximum: 1
+                  minimum: 0
+                  type: integer
               required:
               - create
               - prefix
@@ -115,7 +130,6 @@ spec:
               type: object
           required:
           - clean
-          - openshiftAPIServer
           - project
           - user
           - stack

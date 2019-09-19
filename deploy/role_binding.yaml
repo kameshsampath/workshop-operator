@@ -8,7 +8,7 @@ roleRef:
   name: cluster-admin
 subjects:
 - kind: ServiceAccount
-  name: rhd-workshop-operator
+  name: workshop-operator
   namespace: rhd-workshop-infra
 ---
 kind: RoleBinding
