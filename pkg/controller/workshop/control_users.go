@@ -12,6 +12,7 @@ import (
 	oauthv1 "github.com/openshift/api/config/v1"
 
 	corev1 "k8s.io/api/core/v1"
+	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -29,8 +30,6 @@ func (r *ReconcileWorkshop) createUsersRolesAndRoleBindings(reqLogger logr.Logge
 		Name:      create.HtpassSecretName,
 		Namespace: create.HtpassSecretNamespace,
 	}, us)
-
-	log.Info("Secret:::", "", us, "Err", err)
 
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating Users secret")
@@ -68,7 +67,7 @@ func (r *ReconcileWorkshop) createUsersRolesAndRoleBindings(reqLogger logr.Logge
 	}
 
 	//OCP Admin
-	ocpadminRoleB := create.WorkshopStudentRoleBinding()
+	ocpadminRoleB := create.OcpAdminRoleBinding()
 
 	err = r.client.Get(context.TODO(),
 		types.NamespacedName{Name: create.OcpAdminRoleName}, ocpadminRoleB)
@@ -109,8 +108,10 @@ func (r *ReconcileWorkshop) createUsersRolesAndRoleBindings(reqLogger logr.Logge
 	//Workshop Student Role
 	workshopStudentRole := create.WorkshopStudentRole()
 
+	wr := &rbac.ClusterRole{}
+
 	err = r.client.Get(context.TODO(),
-		types.NamespacedName{Name: create.RoleName}, workshopStudentRole)
+		types.NamespacedName{Name: create.RoleName}, wr)
 
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating Workshop Students Role")
@@ -121,7 +122,8 @@ func (r *ReconcileWorkshop) createUsersRolesAndRoleBindings(reqLogger logr.Logge
 		controllerutil.SetControllerReference(workshop, workshopStudentRole, r.scheme)
 	} else {
 		reqLogger.Info("Update Workshop Students Role")
-		err = r.client.Update(context.TODO(), workshopStudentRole)
+		wr.Rules = workshopStudentRole.Rules
+		err = r.client.Update(context.TODO(), wr)
 		if err != nil {
 			return err
 		}
@@ -130,8 +132,10 @@ func (r *ReconcileWorkshop) createUsersRolesAndRoleBindings(reqLogger logr.Logge
 	//Workshop Student RoleBinding
 	workshopStudentRoleB := create.WorkshopStudentRoleBinding()
 
+	wrb := &rbac.ClusterRoleBinding{}
+
 	err = r.client.Get(context.TODO(),
-		types.NamespacedName{Name: create.RoleName}, workshopStudentRoleB)
+		types.NamespacedName{Name: create.RoleName}, wrb)
 
 	if err != nil && errors.IsNotFound(err) {
 		reqLogger.Info("Creating Workshop Students Role")
