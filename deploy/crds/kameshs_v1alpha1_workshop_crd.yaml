@@ -53,13 +53,19 @@ spec:
               properties:
                 che:
                   properties:
-                    selfsignedcert:
+                    enableTokenExchange:
                       type: boolean
-                    tlssupport:
+                    operatorImage:
+                      type: string
+                    selfSignedCert:
+                      type: boolean
+                    tlsSupport:
                       type: boolean
                     version:
                       type: string
                   required:
+                  - enableTokenExchange
+                  - operatorImage
                   - version
                   type: object
                 community:

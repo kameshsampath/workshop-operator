@@ -41,9 +41,11 @@ type PackageInfo struct {
 
 //EclipseChe configures few parameters for CR Eclipse Che Cluster
 type EclipseChe struct {
-	CheVersion     string `json:"version"`
-	TLSSupport     bool   `json:"tlssupport,omitempty"`
-	SelfSignedCert bool   `json:"selfsignedcert,omitempty"`
+	EnableTokenExchange bool   `json:"enableTokenExchange"`
+	OperatorImage       string `json:"operatorImage"`
+	CheVersion          string `json:"version"`
+	TLSSupport          bool   `json:"tlsSupport,omitempty"`
+	SelfSignedCert      bool   `json:"selfSignedCert,omitempty"`
 }
 
 // WorkshopSpec defines the desired state of Workshop

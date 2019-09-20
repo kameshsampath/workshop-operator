@@ -2,9 +2,9 @@ package workshop
 
 import (
 	"context"
-	"fmt"
+	"strings"
+	"time"
 
-	"github.com/kameshsampath/workshop-operator/pkg/create"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -33,8 +33,6 @@ import (
 	marketplacev2 "github.com/operator-framework/operator-marketplace/pkg/apis/operators/v2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var log = logf.Log.WithName("controller_workshop")
@@ -58,7 +56,6 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	//OpenShift
-
 	if err := userv1.AddToScheme(m.GetScheme()); err != nil {
 		log.Error(err, "Error adding OpenShift User API to scheme")
 	}
@@ -90,6 +87,7 @@ func add(m manager.Manager, r reconcile.Reconciler) error {
 
 	}
 
+	//Operators and OLM
 	if err := olm.AddToScheme(m.GetScheme()); err != nil {
 		log.Error(err, "Failed to add olm to scheme")
 	}
@@ -285,293 +283,42 @@ func (r *ReconcileWorkshop) Reconcile(request reconcile.Request) (reconcile.Resu
 
 	//Create workshop projects
 	if workshop.Spec.Project.Create {
-		projects := create.WorkshopProjects(workshop.Spec)
-		for _, p := range projects {
-			err = r.client.Get(context.TODO(),
-				types.NamespacedName{Name: p.Name}, p)
-			if err != nil {
-				if errors.IsNotFound(err) {
-					reqLogger.Info("Creating Workshop Project", "Project Name", p.Name)
-					err := r.client.Create(context.TODO(), p)
-					if err != nil {
-						return reconcile.Result{Requeue: true}, err
-					}
-					controllerutil.SetControllerReference(workshop, p, r.scheme)
-				} else {
-					reqLogger.Info("Creating Workshop Project", "Project Name", p.Name, "Already Exists")
-				}
-			}
+		err = r.createProjects(log, workshop)
+		if err != nil {
+			return reconcile.Result{Requeue: true}, err
 		}
-
 	}
 
 	//Create workshop users
 	if workshop.Spec.User.Create {
-		log.Info("Creating Workshop Users")
-
-		isUsersUpdate := false
-
-		idps, userSecret, _ := create.WorkshopUsers(workshop.Spec)
-
-		us := &corev1.Secret{}
-
-		err = r.client.Get(context.TODO(), types.NamespacedName{
-			Name:      create.HtpassSecretName,
-			Namespace: create.HtpassSecretNamespace,
-		}, us)
-
-		log.Info("Secret:::", "", us, "Err", err)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Users secret")
-			err = r.client.Create(context.TODO(), userSecret)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, userSecret, r.scheme)
-			isUsersUpdate = true
-		} else {
-			reqLogger.Info("Updating Users secret")
-			us.Data["htpasswd"] = userSecret.Data["htpasswd"]
-			err = r.client.Update(context.TODO(), us)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			isUsersUpdate = true
-		}
-
-		if isUsersUpdate {
-			oauth := &oauthv1.OAuth{}
-			err = r.client.Get(context.TODO(),
-				types.NamespacedName{Name: "cluster"}, oauth)
-
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-
-			reqLogger.Info("Updating OAuth ")
-			oauth.Spec.IdentityProviders = idps
-			err = r.client.Update(context.TODO(), oauth)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-		}
-
-		//OCP Admin
-		ocpadminRoleB := create.WorkshopStudentRoleBinding()
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.OcpAdminRoleName}, ocpadminRoleB)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Cluster Admin Role")
-			err = r.client.Create(context.TODO(), ocpadminRoleB)
-		}
-
+		err = r.createUsersRolesAndRoleBindings(log, workshop)
 		if err != nil {
 			return reconcile.Result{Requeue: true}, err
 		}
-
-		controllerutil.SetControllerReference(workshop, ocpadminRoleB, r.scheme)
-
-		//Workshop Student Group
-
-		workshopStudentGroup := create.WorkshopStudentGroup(workshop.Spec)
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.GroupName}, workshopStudentGroup)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Workshop Students Group")
-			err = r.client.Create(context.TODO(), workshopStudentGroup)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, workshopStudentGroup, r.scheme)
-		} else {
-			reqLogger.Info("Updating Workshop Students Group")
-			err = r.client.Update(context.TODO(), workshopStudentGroup)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-		}
-
-		//Workshop Student Role
-		workshopStudentRole := create.WorkshopStudentRole()
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.RoleName}, workshopStudentRole)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Workshop Students Role")
-			err = r.client.Create(context.TODO(), workshopStudentRole)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, workshopStudentRole, r.scheme)
-		} else {
-			reqLogger.Info("Update Workshop Students Role")
-			err = r.client.Update(context.TODO(), workshopStudentRole)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-		}
-
-		//Workshop Student RoleBinding
-		workshopStudentRoleB := create.WorkshopStudentRoleBinding()
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.RoleName}, workshopStudentRoleB)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Workshop Students Role")
-			err = r.client.Create(context.TODO(), workshopStudentRoleB)
-		}
-
-		if err != nil {
-			return reconcile.Result{Requeue: true}, err
-		}
-
-		controllerutil.SetControllerReference(workshop, workshopStudentRoleB, r.scheme)
-
-	}
-	//Create the CatalogSource Config
-	stackCSCs := create.WorkshopOperatorsCatalog(workshop.Spec)
-
-	for _, csc := range stackCSCs {
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: csc.Name, Namespace: create.CSCNS}, csc)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info(fmt.Sprintf("Creating CatalogSourceConfig : %s", csc.Name))
-			err = r.client.Create(context.TODO(), csc)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, csc, r.scheme)
-		} else {
-			reqLogger.Info(fmt.Sprintf("Updating CatalogSourceConfig : %s", csc.Name))
-			err = r.client.Update(context.TODO(), csc)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-		}
-
 	}
 
+	//Create workshop catalogs
+	err = r.createCatalogSourceConfigs(reqLogger, workshop)
+	if err != nil {
+		return reconcile.Result{Requeue: true}, err
+	}
+
+	//Create workshop stacks
 	if workshop.Spec.Stack.Install {
-		//Install Nexus
-
-		nexusIS := create.NexusImageStream()
-		is := &isv1.ImageStream{}
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, is)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Nexus Image Stream")
-			err = r.client.Create(context.TODO(), nexusIS)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, nexusIS, r.scheme)
+		err = r.installNexus(reqLogger, workshop)
+		if err != nil {
+			return reconcile.Result{Requeue: true}, err
 		}
-
-		nexus := create.Nexus()
-		ndc := &osappsv1.DeploymentConfig{}
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, ndc)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Deploying Nexus")
-			err = r.client.Create(context.TODO(), nexus)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
+		err = r.installAndConfigureEclipseChe(reqLogger, workshop)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				if strings.Contains(err.Error(), "\"eclipse-che.v7.1.0\" not found") {
+					reqLogger.Info("Che CSV is not yet available, will trying again")
+					return reconcile.Result{Requeue: true, RequeueAfter: time.Second * 10}, err
+				}
 			}
-			controllerutil.SetControllerReference(workshop, nexus, r.scheme)
-		}
+			return reconcile.Result{Requeue: true}, err
 
-		//Nexus Service
-		nexusSvc := create.NexusService()
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.NexusDeploymentName, Namespace: create.RHDWorkshopNamespace}, nexusSvc)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Deploying Nexus Service")
-			err = r.client.Create(context.TODO(), nexusSvc)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, nexusSvc, r.scheme)
-		}
-
-		//Install Eclipse Che
-		cheProject := create.CheProject()
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheInstallNamespace}, cheProject)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Che project")
-			err = r.client.Create(context.TODO(), cheProject)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, cheProject, r.scheme)
-		}
-
-		cheCSC := create.CheCatalogSourceConfig()
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheCSCName, Namespace: create.CSCNS}, cheCSC)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Che CatalogSource Config")
-			err = r.client.Create(context.TODO(), cheCSC)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, cheCSC, r.scheme)
-		}
-
-		cheOG := create.CheOperatorGroup()
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheOperatorGroupName, Namespace: create.CheInstallNamespace}, cheOG)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Che Operator Group ")
-			err = r.client.Create(context.TODO(), cheOG)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, cheOG, r.scheme)
-		}
-
-		cheSub := create.CheSubscription(workshop.Spec)
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, cheSub)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Che Subscription")
-			err = r.client.Create(context.TODO(), cheSub)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, cheSub, r.scheme)
-		}
-
-		che := create.CheCluster(workshop.Spec)
-		eche := &cheorgv1.CheCluster{}
-
-		err = r.client.Get(context.TODO(),
-			types.NamespacedName{Name: create.CheSubscriptionName, Namespace: create.CheInstallNamespace}, eche)
-
-		if err != nil && errors.IsNotFound(err) {
-			reqLogger.Info("Creating Che Cluster")
-			err = r.client.Create(context.TODO(), che)
-			if err != nil {
-				return reconcile.Result{Requeue: true}, err
-			}
-			controllerutil.SetControllerReference(workshop, che, r.scheme)
 		}
 	}
 

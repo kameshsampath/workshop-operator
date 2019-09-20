@@ -3,6 +3,7 @@ module github.com/kameshsampath/workshop-operator
 require (
 	github.com/eclipse/che-operator v0.0.0-20190905134656-e6153050c26d
 	github.com/emicklei/go-restful v2.10.0+incompatible // indirect
+	github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/jsonreference v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.3
 	github.com/gogo/protobuf v1.3.0 // indirect

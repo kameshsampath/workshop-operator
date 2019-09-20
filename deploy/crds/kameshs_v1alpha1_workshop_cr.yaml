@@ -20,8 +20,10 @@ spec:
   stack:
     install: true
     che:
-      tlssupport: true
-      selfsignedcert: false
+      enableTokenExchange: true
+      operatorImage: "quay.io/rhdevelopers/che-operator:v7.1.0"
+      tlsSupport: true
+      selfSignedCert: false
       version: 7.1.0
     community:
       - name: "knative-serving"
